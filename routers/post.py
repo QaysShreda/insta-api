@@ -6,11 +6,12 @@ from fastapi.exceptions import HTTPException
 from sqlalchemy.orm import Session
 from routers.schemas import PostDisply
 from typing import List
-
+from routers.schemas import UserAuth
 from db import db_post
 from db.database import get_db
 from routers.schemas import PostBase
 import shutil
+from auth.oauth2 import get_current_user
 
 router = APIRouter(
     prefix='/post',
@@ -20,7 +21,7 @@ router = APIRouter(
 image_url_types = ['absolute','relative']
 
 @router.post('',response_model= PostDisply)
-def create(request:PostBase,db:Session=Depends(get_db)):
+def create(request:PostBase,db:Session=Depends(get_db),current_user:UserAuth = Depends(get_current_user)):
     if request.imge_url_type not in image_url_types:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="Prameter image url type can only take absolute or realtive.")
@@ -31,7 +32,7 @@ def get_post(db:Session=Depends(get_db)):
     return  db_post.get_all(db)
 
 @router.post('/image')
-def upload_image(image:UploadFile=File(...)):
+def upload_image(image:UploadFile=File(...),current_user:UserAuth = Depends(get_current_user)):
     letters = string.ascii_letters
     rand_str = ''.join(random.choice(letters) for i in range(6))
     new = f'_{rand_str}.'
@@ -42,3 +43,7 @@ def upload_image(image:UploadFile=File(...)):
         shutil.copyfileobj(image.file,buffer)
 
     return  {'filename':path}
+
+@router.get('/delete/{id}')
+def delete(id:int,db:Session= Depends(get_db),current_user:UserAuth=Depends(get_current_user)):
+    return db_post.delete(db,id,current_user.id)
